@@ -35,9 +35,9 @@ logic [DATA_W-1:0]     gpio_read_data;
 logic [DATA_W-1:0]     	mem_read_data;
 logic [DATA_W-1:0]  	led_read_data;
 
-assign mem_read_data = (mem_addr == 8'hFD) ? led_read_data :  // LED-uri la FD
-                       (mem_addr >= 8'hFE) ? gpio_read_data : // GPIO la FE/FF
-                       ram_read_data;                         // Restul e RAM
+	assign mem_read_data = (mem_addr == 8'hFD) ? led_read_data :  	// LEDS at address 0xFD,
+		(mem_addr >= 8'hFE) ? gpio_read_data : 						// GPIO at 0xFE/oxFF
+                       ram_read_data;                         		// Rest is RAM
 assign reg_write_data_wire = mem_to_reg_wire ? mem_read_data : (use_imm_wire ? instruction_wire[7:0] : alu_result_wire);
 assign mem_addr       = reg_data2_wire;
 assign mem_write_data = reg_data1_wire;
