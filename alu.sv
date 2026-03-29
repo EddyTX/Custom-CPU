@@ -1,4 +1,3 @@
-//Adunare, Scadere, AND, OR => 2 biti de OPCODE
 module alu #(
 	parameter WIDTH = 8
 ) (
