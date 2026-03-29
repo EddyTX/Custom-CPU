@@ -1,2 +1,67 @@
-# Custom-CPU
-Custom 8-bit RISC on Intel FPGA
+# Custom 8-bit RISC Processor on FPGA
+
+This repository contains a custom 8-bit soft-core RISC processor written in SystemVerilog. The project was designed and tested on an Intel MAX 10 FPGA. It includes the full RTL design and a custom Python assembler.
+
+## Hardware Architecture
+* **Type:** Harvard Architecture (separate physical memories for data and instructions).
+* **Control Unit:** 2-state Finite State Machine (FETCH and EXECUTE). Every instruction takes exactly 2 clock cycles.
+* **Data Path:** 8-bit. The ALU, RAM, and internal buses operate on 8 bits.
+* **Instruction Word:** 16-bit. Instructions are 16 bits wide to fetch the opcode and operands in a single clock cycle.
+* **Registers:** 16 general-purpose 8-bit registers (`R0` - `R15`).
+* **I/O:** Memory-Mapped I/O. Peripherals are accessed via standard memory addresses.
+
+## Instruction Set Architecture (ISA)
+The processor supports a basic RISC instruction set. 
+
+| Instruction | Opcode | Syntax | Description |
+| :--- | :--- | :--- | :--- |
+| `ADD` | `0000` | `ADD R_dest, R_src1, R_src2` | Add two registers. |
+| `SUB` | `0001` | `SUB R_dest, R_src1, R_src2` | Subtract two registers. |
+| `AND` | `0010` | `AND R_dest, R_src1, R_src2` | Bitwise AND. |
+| `OR` |  `0011` | `OR R_dest, R_src1, R_src2`  | Bitwise OR. |
+| `SHL` | `0100` | `SHL R_dest, R_src, R_poz`   | Logical shift left. |
+| `SHR` | `0101` | `SHR R_dest, R_src, R_poz`   | Logical shift right. |
+| `LDI` | `0110` | `LDI R_dest, Imm_Value`      | Load 8-bit immediate value into register. |
+| `LOAD`| `0111` | `LOAD R_dest, R_addr`        | Read from RAM / Peripheral into register. |
+| `STORE`|`1000` | `STORE R_data, R_addr`       | Write register data to RAM / Peripheral. |
+| `JMP` | `1001` | `JMP Label/Address`          | Unconditional jump to ROM address. |
+| `JMPZ`| `1010` | `JMPZ Label/Address`         | Conditional jump (if Zero Flag == 1). |
+
+## Memory Map
+Addresses from `0xFD` to `0xFF` are reserved for I/O peripherals:
+- `0xFF` **(PORT)** - GPIO (e.g., reading buttons).
+- `0xFE` **(DDR)** - Data Direction Register (configuring GPIO input/output).
+- `0xFD` **(LEDS)** - Dedicated output for the FPGA board LEDs.
+
+## Demo Program (`cod.asm`)
+The repository includes a sample assembly program that creates a LED chaser effect. This demo serves as a practical example of how to program the CPU. 
+
+It demonstrates how to:
+* Access memory-mapped I/O to control the FPGA LEDs (`STORE` to address `0xFD`).
+* Create nested loops for software-based delays.
+* Use arithmetic operations (`ADD`) and logical shifts (`SHR`) to manipulate bits.
+* Use conditional jumps (`JMPZ`) to control the execution flow and change the LED direction.
+
+## Software Toolchain
+You can write and upload new assembly programs without recompiling the FPGA bitstream:
+1. Write your assembly code in `cod.asm`.
+2. Run the assembler: `python3 assembler.py`.
+3. The script generates a `program.mif` file in the Intel Quartus format.
+4. In Quartus, use `Processing -> Update Memory Initialization File`, then `Processing -> Start -> Start Assembler` to update the ROM in seconds.
+
+## Hardware Integration
+The processor core is board-agnostic. To run it on your specific FPGA, instantiate the `top.sv` module in your board's top-level wrapper and map the I/O ports to your physical pins.
+
+```systemverilog
+// Top-level instantiation example:
+top #(
+	.DATA_W(8),
+	.INST_W(16),
+	.REG_ADDR_W(4),
+	.MEM_ADDR_W(8)
+) cpu_core (
+	.clk(MAX10_CLK1_50),
+	.rst_n(KEY[0]),
+	.gpio_pins(GPIO[35:28]),
+	.leds_red(LEDR[7:0])
+);
