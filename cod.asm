@@ -1,19 +1,19 @@
-; Program care face un LED sa se plimbe stanga-dreapta pe cele 8 led-uri alea FPGA-ului, cu o viteza controlata de un delay.
+; Program that makes an LED move left-right across the 8 LEDs of the FPGA, with a speed controlled by a delay.
 START:
-    LDI R2, 253      ; 0xFD - Adresa hardware a LED-urilor
-    LDI R5, 1        ; Constanta 1 (folosita la scaderi)
-    LDI R1, 1        ; Pattern-ul initial (0000 0001)
+    LDI R2, 253      ; 0xFD - Hardware address of the LEDs
+    LDI R5, 1        ; Constant 1 (used for subtractions)
+    LDI R1, 1        ; Initial pattern (0000 0001)
 
-;  Muta spre stanga
+;  Move to the left
 LEFT_LOOP:
-    STORE R1, R2     ; Afiseaza pe LED-uri (Scrie R1 la adresa din R2)
+    STORE R1, R2     ; Display on LEDs (Write R1 to the address in R2)
 
-    ; Delay stanga (un loop care scade niste valori pentru a crea o intarziere vizibila)
+    ; Left delay (a loop that subtracts some values to create a visible delay)
     LDI R3, 255
 D1:
     LDI R4, 255
 D2:
-    LDI R6, 4       ; Numar care indica viteza (mai mare = mai lent)
+    LDI R6, 4       ; Number indicating speed (higher = slower)
 D3:
     SUB R6, R6, R5
     JMPZ D3_DONE
@@ -28,25 +28,25 @@ D2_DONE:
     JMP D1
 L_DELAY_DONE:
 
-    ; Verifica marginea stanga (daca R1 e 0x80, inseamna ca am ajuns la marginea stanga)
+    ; Check left edge (if R1 is 0x80, it means we reached the left edge)
     LDI R7, 128      ; 0x80 (1000 0000)
-    SUB R0, R1, R7   ; R1 - 128. Daca e 0, se face jump-ul
-    JMPZ GO_RIGHT    ; Daca a lovit marginea stanga, schimba sensul
+    SUB R0, R1, R7   ; R1 - 128. If it's 0, the program jumps
+    JMPZ GO_RIGHT    ; If it hit the left edge, change direction
 
-    ; Shift stanga (R1 << 1)
-    ADD R1, R1, R1   ; Shift left cu 1 (se putea folosi si SHL R1, R1, 1)
-    JMP LEFT_LOOP    ; Repeta
+    ; Shift left (R1 << 1)
+    ADD R1, R1, R1   ; Shift left by 1 (could also use SHL R1, R1, 1)
+    JMP LEFT_LOOP    ; Repeat
 
-; Muta spre dreapta
+; Move to the right
 GO_RIGHT:
-    STORE R1, R2     ; Afiseaza pe LED-uri
+    STORE R1, R2     ; Display on LEDs
 
-    ; Delay dreapta (aceeasi logica ca la stanga)
+    ; Right delay (same logic as the left one)
     LDI R3, 255
 D4:
     LDI R4, 255
 D5:
-    LDI R6, 4       ; Aceeasi valoare pentru viteza
+    LDI R6, 4       ; Same value for speed
 D6:
     SUB R6, R6, R5
     JMPZ D6_DONE
@@ -61,11 +61,11 @@ D5_DONE:
     JMP D4
 R_DELAY_DONE:
 
-    ; Verifica marginea dreapta (daca R1 e 0x01, inseamna ca am ajuns la marginea dreapta)
+    ; Check right edge (if R1 is 0x01, it means we reached the right edge)
     LDI R7, 1
     SUB R0, R1, R7
-    JMPZ START       ; Daca a lovit marginea initiala, o luam de la capat in stanga!
+    JMPZ START       ; If it hit the initial edge, we start over to the left!
 
-    ; --- SHIFT DREAPTA ---
-    SHR R1, R1, R5   ; Shiftam logic la dreapta
-    JMP GO_RIGHT     ; Repeta
+    ; --- SHIFT RIGHT ---
+    SHR R1, R1, R5   ; Logical shift to the right
+    JMP GO_RIGHT     ; Repeat
