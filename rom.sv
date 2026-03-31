@@ -7,7 +7,6 @@ module rom #(
     output logic [DATA_W-1:0] instruction
 );
 
-    // Atributul magic care leaga memoria hardware de fisierul MIF
     (* ram_init_file = "program.mif" *) logic [DATA_W-1:0] rom_array [0:(2**ADDR_W)-1];
 
     always_ff @(posedge clk) begin
