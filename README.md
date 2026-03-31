@@ -26,6 +26,7 @@ The processor supports a basic RISC instruction set.
 | `STORE`|`1000` | `STORE R_data, R_addr`       | Write register data to RAM / Peripheral. |
 | `JMP` | `1001` | `JMP Label/Address`          | Unconditional jump to ROM address. |
 | `JMPZ`| `1010` | `JMPZ Label/Address`         | Conditional jump (if Zero Flag == 1). |
+| `RETI`| `1011` | `RETI`						| Return from Interrupt
 
 ## Memory Map
 Addresses from `0xFD` to `0xFF` are reserved for I/O peripherals:
