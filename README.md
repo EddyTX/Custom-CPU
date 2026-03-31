@@ -29,10 +29,16 @@ The processor supports a basic RISC instruction set.
 | `RETI`| `1011` | `RETI`						| Return from Interrupt
 
 ## Memory Map
-Addresses from `0xFD` to `0xFF` are reserved for I/O peripherals:
+Addresses from `0xFB` to `0xFF` are reserved for I/O peripherals:
 - `0xFF` **(PORT)** - GPIO (e.g., reading buttons).
 - `0xFE` **(DDR)** - Data Direction Register (configuring GPIO input/output).
 - `0xFD` **(LEDS)** - Dedicated output for the FPGA board LEDs.
+
+So that the timer can count to numbers higher than 255, the timer's target should be on 16 bits, but since our locations are on 8 bits, there are 2 distinct addresses for the target's upper part and lower part:
+- `0xFB` - Lower half of the target number.
+- `0xFC` - Upper half of the target number.
+
+Which results in the timer's target number being `{upper_half, lower_half};`.
 
 ## Demo Programs (`cod.asm` and `old_cod.asm`)
 The repository includes 2 sample assembly programs that:
