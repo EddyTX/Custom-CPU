@@ -35,12 +35,19 @@ logic [DATA_W-1:0]     gpio_read_data;
 logic [DATA_W-1:0]     	mem_read_data;
 logic [DATA_W-1:0]  	led_read_data;
 
-	assign mem_read_data = (mem_addr == 8'hFD) ? led_read_data :  	// LEDS at address 0xFD,
-		(mem_addr >= 8'hFE) ? gpio_read_data : 						// GPIO at 0xFE/oxFF
-                       ram_read_data;                         		// Rest is RAM
+logic irq_wire;
+logic save_pc_wire;
+logic restore_pc_wire;
+logic isr_active_wire;
+logic [MEM_ADDR_W-1:0] final_jump_addr;
+
+assign mem_read_data = (mem_addr == 8'hFD) ? led_read_data :  // LED-uri la 0xFD
+                       (mem_addr >= 8'hFE) ? gpio_read_data : // GPIO la 0xFE/FF
+                       ram_read_data;                         // Restul e RAM
 assign reg_write_data_wire = mem_to_reg_wire ? mem_read_data : (use_imm_wire ? instruction_wire[7:0] : alu_result_wire);
 assign mem_addr       = reg_data2_wire;
 assign mem_write_data = reg_data1_wire;
+assign final_jump_addr = isr_active_wire ? 8'h02 : instruction_wire[DATA_W-1:0];
 
 alu #( 
 	.WIDTH(DATA_W)
@@ -73,9 +80,11 @@ program_counter #(
 	.clk(clk), 
 	.rst_n(rst_n), 
 	.jump_en(jump_en_wire),
-	.jump_addr(instruction_wire[DATA_W-1:0]),
+	.jump_addr(final_jump_addr),
 	.pc_out(pc_wire),
-	.pc_en(pc_en_wire)
+	.pc_en(pc_en_wire),
+	.save_pc_en(save_pc_wire),
+    .restore_pc_en(restore_pc_wire)
 );
 
 control_unit #( 
@@ -91,7 +100,11 @@ control_unit #(
 	.alu_opcode(alu_opcode_wire),
 	.use_imm(use_imm_wire),
 	.mem_write_en(mem_write_en),
-	.mem_to_reg(mem_to_reg_wire)
+	.mem_to_reg(mem_to_reg_wire),
+	.irq(irq_wire),
+    .save_pc_en(save_pc_wire),
+    .restore_pc_en(restore_pc_wire),
+    .isr_active(isr_active_wire)
 );
 
 rom #( 
@@ -138,6 +151,18 @@ led_controller #(
     .mem_write_data (mem_write_data),
     .mem_read_data  (led_read_data),
     .leds           (leds_red)
+);
+
+timer #(
+	.PRESCALER(49999),
+	.DATA_W(DATA_W)
+) timer_inst (
+	.clk(clk),
+	.rst_n(rst_n),
+	.mem_write_en(mem_write_en),
+	.mem_addr(mem_addr),
+	.mem_write_data(mem_write_data),
+	.timer_done(irq_wire)
 );
 
 endmodule

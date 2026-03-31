@@ -3,7 +3,7 @@ import os
 OPCODES = {
     'ADD': '0000', 'SUB': '0001', 'AND': '0010', 'OR': '0011',
     'SHL': '0100', 'SHR': '0101', 'LDI': '0110', 'LOAD': '0111',
-    'STORE': '1000', 'JMP': '1001', 'JMPZ': '1010'
+    'STORE': '1000', 'JMP': '1001', 'JMPZ': '1010', 'RETI': '1011'
 }
 
 ADDRESSES = {'LEDS': '0xFD', 'DDR': '0xFE', 'PORT': '0xFF'}
@@ -59,6 +59,10 @@ def assemble_line(line, labels):
             
         addr_bin = format(addr_val, '08b')
         return opcode_bin + '0000' + addr_bin
+    
+    # 5. RETI Format
+    elif instr == 'RETI':
+        return opcode_bin + '000000000000'
 
     return None
 
