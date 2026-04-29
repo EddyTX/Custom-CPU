@@ -1,4 +1,5 @@
 import os
+import argparse
 
 OPCODES = {
     'ADD': '0000', 'SUB': '0001', 'AND': '0010', 'OR': '0011',
@@ -6,7 +7,7 @@ OPCODES = {
     'STORE': '1000', 'JMP': '1001', 'JMPZ': '1010', 'RETI': '1011'
 }
 
-ADDRESSES = {'LEDS': '0xFD', 'DDR': '0xFE', 'PORT': '0xFF'}
+ADDRESSES = {}
 REGISTERS = {f'R{i}': format(i, '04b') for i in range(16)}
 
 def assemble_line(line, labels):
@@ -106,14 +107,22 @@ def assemble_file(input_filename, output_filename):
     return labels
 
 if __name__ == '__main__':
-    # Automatically resolve paths relative to the script's location
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    input_asm = os.path.join(script_dir, 'cod.asm')
-    output_bin = os.path.join(script_dir, 'program.mif')
+    # Configuram parser-ul pentru argumente din terminal
+    parser = argparse.ArgumentParser(description="Asamblor pentru CPU Custom (Generare fisier .mif)")
+    parser.add_argument("input_file", help="Calea catre fisierul cod sursa (.asm)")
+    parser.add_argument("-o", "--output", help="Calea catre fisierul binar de iesire (.mif). Daca nu pui nimic, merge un folder in spate.")
+    
+    args = parser.parse_args()
+    input_asm = args.input_file
+    
+    # Setam output-ul in folderul parinte (..) daca nu e dat altul
+    if args.output:
+        output_bin = os.path.abspath(args.output)
+    else:
+        output_bin = os.path.abspath(os.path.join(os.getcwd(), '..', 'program.mif'))
 
     try:
         rezultat_labels = assemble_file(input_asm, output_bin)
-        print(f"Success! Quartus MIF file generated at: {output_bin}")
-        print(f"Labels resolved: {list(rezultat_labels.keys())}")
+        print(f" Success! File generated at : {output_bin}")
     except FileNotFoundError:
-        print(f"Error: Could not find '{input_asm}'. Make sure the assembly file is in the same folder.")
+        print(f" Error! File not found :  '{input_asm}'.")
