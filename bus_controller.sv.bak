@@ -1,0 +1,52 @@
+module bus_controller #(
+	parameter ADDR_W 		= 8,
+	parameter DATA_W 		= 8,
+	parameter SPI_ADDR_W 	= 6
+) (
+	//CPU Interface
+	input logic	[ADDR_W-1:0]	cpu_addr,
+	input logic 				cpu_read_en,
+	input logic					cpu_write_en,
+	output logic [DATA_W-1:0]	cpu_read_data,
+	output logic				cpu_mem_ready,
+	
+	//RAM Interface
+	input logic [DATA_W-1:0]	ram_read_data,
+	output logic				ram_write_en,
+	
+	//SPI Interface (Sensor)
+	input logic		[DATA_W-1:0]			spi_read_data,
+	input logic								spi_ack,
+	output logic 	[SPI_ADDR_W-1:0]		spi_addr,
+	output logic							spi_read_en,
+	output logic							spi_write_en,
+	
+	//GPIO & Timer Interface
+	input logic [DATA_W-1:0]			timer_read_data,
+	input logic [DATA_W-1:0]			switch_read_data,
+	input logic [DATA_W-1:0]			gpio_read_data,
+	output logic						timer_write_en,
+	output logic						led_write_en
+);
+
+assign ram_write_en 	= (cpu_write_en & ~cpu_addr[7]);
+assign spi_write_en 	= (cpu_write_en & (cpu_addr[7] & ~cpu_addr[6]));
+assign spi_read_en 		= (cpu_read_en & (cpu_addr[7] & ~cpu_addr[6]));
+assign timer_write_en 	= (cpu_write_en & (cpu_addr == 8'hF8 | cpu_addr == 8'hF9));
+assign led_write_en 	= (cpu_write_en & (cpu_addr == 8'hFC | cpu_addr == 8'hFD));
+assign spi_addr			= cpu_addr[SPI_ADDR_W-1:0];
+assign cpu_mem_ready	= (cpu_addr[7] & ~cpu_addr[6]) ? spi_ack : 1'b1;
+
+always_comb begin
+	cpu_read_data = 0;
+	if(cpu_read_en)
+		casez(cpu_addr)
+			8'b0???????:	cpu_read_data = ram_read_data;
+			8'b10??????:	cpu_read_data = spi_read_data;
+			8'b1111_100?:	cpu_read_data = timer_read_data;
+			8'b1111_101?:	cpu_read_data = switch_read_data;
+			8'b1111_111?:	cpu_read_data = gpio_read_data;
+		endcase
+end
+
+endmodule
