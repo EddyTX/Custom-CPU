@@ -1,4 +1,3 @@
-//16 registers (t0...t15), 8 bits each
 module registers #(
 	parameter WIDTH = 8,
 	parameter ADDR_W = 4

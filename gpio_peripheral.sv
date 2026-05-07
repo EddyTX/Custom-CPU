@@ -1,9 +1,9 @@
 module gpio_peripheral #(
-	parameter WIDTH = 8,
-	parameter ADDR_W = 8,
-	parameter BASE_ADDR = 8'hFE,
-	parameter FORCE_INPUT = 0,
-	parameter FORCE_OUTPUT = 0
+	parameter WIDTH 		= 8,
+	parameter ADDR_W 		= 8,
+	parameter BASE_ADDR 	= 8'hFE,
+	parameter FORCE_INPUT 	= 0,
+	parameter FORCE_OUTPUT 	= 0
 ) (
 	input logic 				clk,
 	input logic 				rst_n,
@@ -19,8 +19,8 @@ localparam PORT_ADDRESS = BASE_ADDR + 1;
 
 logic [WIDTH-1:0] ddr_reg, port_reg;
 logic [WIDTH-1:0] effective_ddr;
-assign effective_ddr = FORCE_INPUT ? '0 : (FORCE_OUTPUT ? '1 : ddr_reg);
 
+assign effective_ddr = FORCE_INPUT ? '0 : (FORCE_OUTPUT ? '1 : ddr_reg);
 assign mem_read_data = (mem_addr == DDR_ADDRESS) ? ddr_reg : (mem_addr == PORT_ADDRESS) ? gpio_pins : '0;
 
 genvar i;

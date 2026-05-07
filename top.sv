@@ -5,16 +5,15 @@ module top #(
     parameter MEM_ADDR_W  = 8,
     parameter SPI_ADDR_W  = 6
 ) (
-    input  logic         clk_50,          // c0 (50MHz) de la PLL-ul din Golden_Top
-    input  logic         clk_spi,         // c1 (1MHz) de la PLL
-    input  logic         clk_spi_shifted, // c2 (1MHz, defazat) de la PLL
-    input  logic         rst_n,           // Reset
+    input  logic         clk_50,          // 50MHz clk (c0)
+    input  logic         clk_spi,         // 1MHz clk (c1)
+    input  logic         clk_spi_shifted, // 1MHz clk (c2) - 220degrees shifted
+    input  logic         rst_n,
     
     output logic [9:0]   leds_red,
     input  logic [9:0]   switches,
-    inout  logic [7:0]   gpio_p,  
+    inout   logic [7:0]   gpio_p,  
     
-    // SPI Pins
     input  logic         spi_miso,
     output logic         spi_mosi,
     output logic         spi_sclk,
@@ -22,190 +21,180 @@ module top #(
     output logic         spi_oe   
 );
 
-    // --- Fire de Interconectare (Bus) ---
-    logic [MEM_ADDR_W-1:0] mem_addr;
-    logic [DATA_W-1:0]     mem_read_data;  
-    logic [DATA_W-1:0]     mem_write_data;
-    logic                  mem_write_en;
-    logic                  mem_read_en;
-    logic                  cpu_mem_ready;
+logic [MEM_ADDR_W-1:0] mem_addr;
+logic [DATA_W-1:0]     mem_read_data;  
+logic [DATA_W-1:0]     mem_write_data;
+logic                  mem_write_en;
+logic                  mem_read_en;
+logic                  cpu_mem_ready;
 
-    // --- Fire Control Periferice (Enables) ---
-    logic                  ram_write_en;
-    logic                  spi_write_en;
-    logic                  spi_read_en;
-    logic                  timer_write_en;
-    logic                  led_write_en;
+logic                  ram_write_en;
+logic                  spi_write_en;
+logic                  spi_read_en;
+logic                  timer_write_en;
+logic                  led_write_en;
 
-    // --- Date de la Periferice ---
-    logic [DATA_W-1:0]     ram_read_data;  
-    logic [DATA_W-1:0]     spi_read_data;
-    logic [DATA_W-1:0]     timer_read_data;
-	 logic [DATA_W-1:0]     led_read_data;
-	 
-	 // --- Sârmă pură pentru LED-uri ---
-    wire [7:0] led_net;
-    assign leds_red[7:0] = led_net;
-    assign leds_red[9:8] = 2'b00; // Le ținem stinse pe ultimele două ca să nu aibă comportament nedefinit
+logic [DATA_W-1:0]     ram_read_data;  
+logic [DATA_W-1:0]     spi_read_data;
+logic [DATA_W-1:0]     timer_read_data;
+logic [DATA_W-1:0]     led_read_data;
+ 
+wire 	[7:0] 			led_net;
+assign leds_red[7:0] = led_net;
+assign leds_red[9:8] = 2'b00;
 
-    // --- Semnale specifice SPI ---
-    logic [SPI_ADDR_W-1:0] spi_addr_internal;
-    logic                  spi_ack_internal;
+logic [SPI_ADDR_W-1:0] spi_addr_internal;
+logic                  spi_ack_internal;
 
-    // --- Semnale Interne Procesor ---
-    logic [MEM_ADDR_W-1:0] pc_wire;         
-    logic [INST_W-1:0]     instruction_wire;
-    logic [DATA_W-1:0]     reg_data1_wire;  
-    logic [DATA_W-1:0]     reg_data2_wire;
-    logic [DATA_W-1:0]     reg_write_data_wire;
-    logic [DATA_W-1:0]     alu_result_wire; 
-    logic [MEM_ADDR_W-1:0] final_jump_addr;
-    logic [2:0]            alu_opcode_wire;
-    logic                  zero_f_wire;
-    logic                  write_en_wire;
-    logic                  jump_en_wire;
-    logic                  use_imm_wire;
-    logic                  mem_to_reg_wire;
-    logic                  pc_en_wire;
-    logic                  save_pc_wire;
-    logic                  restore_pc_wire;
-    logic                  isr_active_wire;
-    logic                  irq_wire;
+logic [MEM_ADDR_W-1:0] pc_wire;         
+logic [INST_W-1:0]     instruction_wire;
+logic [DATA_W-1:0]     reg_data1_wire;  
+logic [DATA_W-1:0]     reg_data2_wire;
+logic [DATA_W-1:0]     reg_write_data_wire;
+logic [DATA_W-1:0]     alu_result_wire; 
+logic [MEM_ADDR_W-1:0] final_jump_addr;
+logic [2:0]            alu_opcode_wire;
+logic                  zero_f_wire;
+logic                  write_en_wire;
+logic                  jump_en_wire;
+logic                  use_imm_wire;
+logic                  mem_to_reg_wire;
+logic                  pc_en_wire;
+logic                  save_pc_wire;
+logic                  restore_pc_wire;
+logic                  isr_active_wire;
+logic                  irq_wire;
 
-    // --- Logica de Rutare ---
-    assign mem_addr            = reg_data2_wire; 
-    assign mem_write_data      = reg_data1_wire;
-    assign final_jump_addr     = isr_active_wire ? 8'h02 : instruction_wire[7:0];
-    assign reg_write_data_wire = mem_to_reg_wire ? mem_read_data : 
-                                 (use_imm_wire   ? instruction_wire[7:0] : alu_result_wire);
+assign mem_addr            = reg_data2_wire; 
+assign mem_write_data      = reg_data1_wire;
+assign final_jump_addr     = isr_active_wire ? 8'h02 : instruction_wire[7:0];
+assign reg_write_data_wire = mem_to_reg_wire ? mem_read_data : 
+                             (use_imm_wire   ? instruction_wire[7:0] : alu_result_wire);
 
-    // ========================================================================
-    // INSTANȚIERI MODULE
-    // ========================================================================
 
-    bus_controller #( .ADDR_W(8), .DATA_W(8), .SPI_ADDR_W(6) ) bus_ctrl (
-        .cpu_addr         ( mem_addr         ),
-        .cpu_read_en      ( mem_read_en      ),
-        .cpu_write_en     ( mem_write_en     ),
-        .cpu_read_data    ( mem_read_data    ),
-        .cpu_mem_ready    ( cpu_mem_ready    ),
-        .ram_read_data    ( ram_read_data    ),
-        .ram_write_en     ( ram_write_en     ),
-        .spi_read_data    ( spi_read_data    ),
-        .spi_ack          ( spi_ack_internal ),
-        .spi_addr         ( spi_addr_internal),
-        .spi_read_en      ( spi_read_en      ),
-        .spi_write_en     ( spi_write_en     ),
-        .timer_read_data  ( timer_read_data  ),
-        .switch_read_data ( switches[7:0]    ),
-        .led_read_data    ( led_read_data	   ), 
-        .timer_write_en   ( timer_write_en   ),
-        .led_write_en     ( led_write_en     ),
-		  .gpio_ext_read_data(8'b0					),
-		  .gpio_ext_write_en(						)
-    );
+bus_controller #( .ADDR_W(8), .DATA_W(8), .SPI_ADDR_W(6) ) bus_ctrl (
+    .cpu_addr         ( mem_addr         ),
+    .cpu_read_en      ( mem_read_en      ),
+    .cpu_write_en     ( mem_write_en     ),
+    .cpu_read_data    ( mem_read_data    ),
+    .cpu_mem_ready    ( cpu_mem_ready    ),
+    .ram_read_data    ( ram_read_data    ),
+    .ram_write_en     ( ram_write_en     ),
+    .spi_read_data    ( spi_read_data    ),
+    .spi_ack          ( spi_ack_internal ),
+    .spi_addr         ( spi_addr_internal),
+    .spi_read_en      ( spi_read_en      ),
+    .spi_write_en     ( spi_write_en     ),
+    .timer_read_data  ( timer_read_data  ),
+    .switch_read_data ( switches[7:0]    ),
+    .led_read_data    ( led_read_data	   ), 
+    .timer_write_en   ( timer_write_en   ),
+    .led_write_en     ( led_write_en     ),
+	.gpio_ext_read_data(8'b0			),
+	.gpio_ext_write_en(					)
+);
 
-    spi_peripheral spi_wrap (
-        .clk_50           ( clk_50           ),
-        .clk_1            ( clk_spi          ),
-        .clk_1_shifted    ( clk_spi_shifted  ),
-        .rst_n            ( rst_n            ),
-        .spi_addr         ( spi_addr_internal),
-        .spi_read_en      ( spi_read_en      ),
-        .spi_write_en     ( spi_write_en     ),
-        .write_data       ( mem_write_data   ),
-        .read_data        ( spi_read_data    ),
-        .spi_ack          ( spi_ack_internal ),
-        .miso             ( spi_miso         ),
-        .mosi             ( spi_mosi         ),
-        .sclk             ( spi_sclk         ),
-        .cs_n             ( spi_cs_n         ),
-        .spi_oe           ( spi_oe           ) 
-    );
+spi_peripheral spi_wrap (
+    .clk_50           ( clk_50           ),
+    .clk_1            ( clk_spi          ),
+    .clk_1_shifted    ( clk_spi_shifted  ),
+    .rst_n            ( rst_n            ),
+    .spi_addr         ( spi_addr_internal),
+    .spi_read_en      ( spi_read_en      ),
+    .spi_write_en     ( spi_write_en     ),
+    .write_data       ( mem_write_data   ),
+    .read_data        ( spi_read_data    ),
+    .spi_ack          ( spi_ack_internal ),
+    .miso             ( spi_miso         ),
+    .mosi             ( spi_mosi         ),
+    .sclk             ( spi_sclk         ),
+    .cs_n             ( spi_cs_n         ),
+    .spi_oe           ( spi_oe           ) 
+);
 
-    control_unit cu_inst (
-        .clk              ( clk_50           ),
-        .rst_n            ( rst_n            ),
-        .instruction      ( instruction_wire ),
-        .zero_f           ( zero_f_wire      ),
-        .irq              ( irq_wire         ),
-        .mem_ready        ( cpu_mem_ready    ),
-        .write_en         ( write_en_wire    ),
-        .jump_en          ( jump_en_wire     ),
-        .use_imm          ( use_imm_wire     ), // Adaugat
-        .alu_opcode       ( alu_opcode_wire  ),
-        .mem_write_en     ( mem_write_en     ),
-        .mem_read_en      ( mem_read_en      ),
-        .mem_to_reg       ( mem_to_reg_wire  ), // Adaugat
-        .pc_en            ( pc_en_wire       ),
-        .save_pc_en       ( save_pc_wire     ), // Adaugat
-        .restore_pc_en    ( restore_pc_wire  ), // Adaugat
-        .isr_active       ( isr_active_wire  )  // Adaugat
-    );
+control_unit cu_inst (
+    .clk              ( clk_50           ),
+    .rst_n            ( rst_n            ),
+    .instruction      ( instruction_wire ),
+    .zero_f           ( zero_f_wire      ),
+    .irq              ( irq_wire         ),
+    .mem_ready        ( cpu_mem_ready    ),
+    .write_en         ( write_en_wire    ),
+    .jump_en          ( jump_en_wire     ),
+    .use_imm          ( use_imm_wire     ), // Adaugat
+    .alu_opcode       ( alu_opcode_wire  ),
+    .mem_write_en     ( mem_write_en     ),
+    .mem_read_en      ( mem_read_en      ),
+    .mem_to_reg       ( mem_to_reg_wire  ), // Adaugat
+    .pc_en            ( pc_en_wire       ),
+    .save_pc_en       ( save_pc_wire     ), // Adaugat
+    .restore_pc_en    ( restore_pc_wire  ), // Adaugat
+    .isr_active       ( isr_active_wire  )  // Adaugat
+);
 
-    program_counter pc_inst (
-        .clk              ( clk_50           ),
-        .rst_n            ( rst_n            ),
-        .pc_en            ( pc_en_wire       ),
-        .jump_en          ( jump_en_wire     ),
-        .jump_addr        ( final_jump_addr  ),
-        .save_pc_en       ( save_pc_wire     ),
-        .restore_pc_en    ( restore_pc_wire  ),
-        .pc_out           ( pc_wire          )
-    );
+program_counter pc_inst (
+    .clk              ( clk_50           ),
+    .rst_n            ( rst_n            ),
+    .pc_en            ( pc_en_wire       ),
+    .jump_en          ( jump_en_wire     ),
+    .jump_addr        ( final_jump_addr  ),
+    .save_pc_en       ( save_pc_wire     ),
+    .restore_pc_en    ( restore_pc_wire  ),
+    .pc_out           ( pc_wire          )
+);
 
-    alu alu_inst (
-        .A                ( reg_data1_wire   ),
-        .B                ( reg_data2_wire   ),
-        .opcode           ( alu_opcode_wire  ),
-        .result           ( alu_result_wire  ),
-        .zero_f           ( zero_f_wire      )
-    );
+alu alu_inst (
+    .A                ( reg_data1_wire   ),
+    .B                ( reg_data2_wire   ),
+    .opcode           ( alu_opcode_wire  ),
+    .result           ( alu_result_wire  ),
+    .zero_f           ( zero_f_wire      )
+);
 
-    registers reg_inst (
-        .clk              ( clk_50           ),
-        .rst_n            ( rst_n            ),
-        .write_en         ( write_en_wire    ),
-        .read_addr_1      ( instruction_wire[7:4] ),
-        .read_addr_2      ( instruction_wire[3:0] ),
-        .write_addr       ( instruction_wire[11:8]),
-        .write_data       ( reg_write_data_wire ),
-        .read_data_1      ( reg_data1_wire   ),
-        .read_data_2      ( reg_data2_wire   )
-    );
+registers reg_inst (
+    .clk              ( clk_50           ),
+    .rst_n            ( rst_n            ),
+    .write_en         ( write_en_wire    ),
+    .read_addr_1      ( instruction_wire[7:4] ),
+    .read_addr_2      ( instruction_wire[3:0] ),
+    .write_addr       ( instruction_wire[11:8]),
+    .write_data       ( reg_write_data_wire ),
+    .read_data_1      ( reg_data1_wire   ),
+    .read_data_2      ( reg_data2_wire   )
+);
 
-    rom rom_inst (
-        .clk              ( clk_50           ),
-        .read_addr        ( pc_wire          ),
-        .instruction      ( instruction_wire )
-    );
+rom rom_inst (
+    .clk              ( clk_50           ),
+    .read_addr        ( pc_wire          ),
+    .instruction      ( instruction_wire )
+);
 
-    data_memory ram_inst (
-        .clk              ( clk_50           ),
-        .write_en         ( ram_write_en     ),
-        .addr             ( mem_addr         ),
-        .write_data       ( mem_write_data   ),
-        .read_data        ( ram_read_data    )
-    );
+data_memory ram_inst (
+    .clk              ( clk_50           ),
+    .write_en         ( ram_write_en     ),
+    .addr             ( mem_addr         ),
+    .write_data       ( mem_write_data   ),
+    .read_data        ( ram_read_data    )
+);
 
-    timer #( .BASE_ADDR(8'hF8)) timer_inst (
-        .clk              ( clk_50           ),
-        .rst_n            ( rst_n            ),
-        .mem_write_en     ( timer_write_en   ),
-        .mem_addr         ( mem_addr         ),
-        .mem_write_data   ( mem_write_data   ),
-        .mem_read_data    ( timer_read_data  ),
-        .timer_done       ( irq_wire         )
-    );
+timer #( .BASE_ADDR(8'hF8)) timer_inst (
+    .clk              ( clk_50           ),
+    .rst_n            ( rst_n            ),
+    .mem_write_en     ( timer_write_en   ),
+    .mem_addr         ( mem_addr         ),
+    .mem_write_data   ( mem_write_data   ),
+    .mem_read_data    ( timer_read_data  ),
+    .timer_done       ( irq_wire         )
+);
 
-    gpio_peripheral #( .BASE_ADDR(8'hFC), .FORCE_OUTPUT(1) ) led_gpio (
-        .clk              ( clk_50           ),
-        .rst_n            ( rst_n            ),
-        .mem_write_en     ( led_write_en     ),
-        .mem_addr         ( mem_addr         ),
-        .mem_write_data   ( mem_write_data   ),
-        .mem_read_data    ( led_read_data    ),
-        .gpio_pins        ( led_net		      ) 
-    );
+gpio_peripheral #( .BASE_ADDR(8'hFC), .FORCE_OUTPUT(1) ) led_gpio (
+    .clk              ( clk_50           ),
+    .rst_n            ( rst_n            ),
+    .mem_write_en     ( led_write_en     ),
+    .mem_addr         ( mem_addr         ),
+    .mem_write_data   ( mem_write_data   ),
+    .mem_read_data    ( led_read_data    ),
+    .gpio_pins        ( led_net		      ) 
+);
 
 endmodule

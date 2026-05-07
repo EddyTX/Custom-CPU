@@ -29,13 +29,14 @@ typedef enum logic [2:0] {
 state_t current_state;
 
 logic [3:0] opcode;
-logic zero_flag_reg;
-logic gie;
-logic irq_reg;
+logic 		zero_flag_reg;
+logic 		gie;
+logic 		irq_reg;
 logic 		is_add, is_sub, is_and	,
 			is_or, is_jmp, is_jmpz	,
 			is_ldi, is_load, is_store,
 			is_shl, is_shr, is_reti;
+logic 		zero_flag_backup;
 
 assign opcode 	= instruction[DATA_W-1:DATA_W-4];
 assign is_add 	= (opcode == 4'b0000);
@@ -53,17 +54,17 @@ assign is_reti 	= (opcode == 4'b1011);
 
 
 assign write_en 		= 	(current_state == EXECUTE) & (is_add | is_sub | is_and | is_or | is_ldi |
-						is_shl | is_shr | is_load) & mem_ready;
-assign jump_en 			= is_jmp | (is_jmpz & zero_flag_reg) | (current_state == ISR);
+							is_shl | is_shr | is_load) & mem_ready;
+assign jump_en 			= 	is_jmp | (is_jmpz & zero_flag_reg) | (current_state == ISR);
 assign alu_opcode 		= 	opcode[2:0];
 assign use_imm 			= 	is_ldi;
 assign mem_write_en 	= 	(current_state == EXECUTE) & is_store;
-assign mem_read_en		= (current_state == EXECUTE) & is_load;
+assign mem_read_en		= 	(current_state == EXECUTE) & is_load;
 assign mem_to_reg		= 	is_load;
-assign pc_en        	= ((current_state == EXECUTE) & mem_ready) | (current_state == ISR);
-assign save_pc_en		= (current_state == ISR);
-assign restore_pc_en	= (current_state == EXECUTE) & is_reti;
-assign isr_active 		= (current_state == ISR);
+assign pc_en        	= 	((current_state == EXECUTE) & mem_ready) | (current_state == ISR);
+assign save_pc_en		= 	(current_state == ISR);
+assign restore_pc_en	= 	(current_state == EXECUTE) & is_reti;
+assign isr_active 		= 	(current_state == ISR);
 
 always_ff @(posedge clk or negedge rst_n) begin
 	if(~rst_n) 										current_state <= FETCH;	else
@@ -77,8 +78,6 @@ always_ff @(posedge clk or negedge rst_n) begin
 		default:    current_state <= FETCH;
 	endcase
 end
-			
-logic zero_flag_backup;
 
 always_ff @(posedge clk or negedge rst_n) begin
 	if (~rst_n) 			zero_flag_backup <= 1'b0;
@@ -86,11 +85,11 @@ always_ff @(posedge clk or negedge rst_n) begin
 end
 
 always_ff @(posedge clk or negedge rst_n) begin
-	if (~rst_n) 				zero_flag_reg <= 1'b0;
-	else if (restore_pc_en) 	zero_flag_reg <= zero_flag_backup; // Restauram contextul vechi
-	else if ((current_state == EXECUTE) & mem_ready) begin
+	if (~rst_n) 				zero_flag_reg <= 1'b0;				else
+	if (restore_pc_en) 			zero_flag_reg <= zero_flag_backup;	else
+	if ((current_state == EXECUTE) & mem_ready) begin
 		if (is_add | is_sub | is_and | is_or | is_shl | is_shr)
-			zero_flag_reg <= zero_f;
+								zero_flag_reg <= zero_f;
 	end
 end
 
@@ -101,9 +100,9 @@ always_ff @(posedge clk or negedge rst_n) begin
 end
 
 always_ff @(posedge clk or negedge rst_n) begin
-	if (~rst_n) 					irq_reg <= 1'b0;
-	else if (irq) 					irq_reg <= 1'b1;
-	else if (current_state == ISR) 	irq_reg <= 1'b0;
+	if (~rst_n) 					irq_reg <= 1'b0;	else
+	if (irq) 						irq_reg <= 1'b1;	else
+	if (current_state == ISR) 		irq_reg <= 1'b0;
 end
 
 endmodule
